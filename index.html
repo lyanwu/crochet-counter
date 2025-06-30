@@ -161,6 +161,7 @@
   <div class="tabs">
     <button class="tab-button active" id="roundTabButton" onclick="showTab('roundTab')">圈數 (0)</button>
     <button class="tab-button" id="stitchTabButton" onclick="showTab('stitchTab')">針數 (0)</button>
+    <button class="tab-button" id="countdownTabButton" onclick="showTab('countdownTab')">倒數針數 (0)</button>
   </div>
 
   <div id="roundTab" class="tab-content active">
@@ -191,6 +192,23 @@
     </div>
   </div>
 
+  <div id="countdownTab" class="tab-content">
+    <div class="counter">
+      <div class="label">輸入總針數</div>
+      <input id="countdownInput" type="number" min="0" inputmode="numeric" style="width: 80%; font-size: 1.2rem; margin-bottom: 0.5rem;">
+      <div class="label">剩餘針數</div>
+      <div id="countdownRemain" class="number">0</div>
+      <div class="buttons">
+        <!-- 反轉功能：-1 會+1，+1 會-1 -->
+        <button class="minus" onclick="changeCountdown(1)">-1</button>
+        <div class="row">
+          <button onclick="changeCountdown(-1)">+1</button>
+          <button class="clear" onclick="resetCountdown()">清除針數</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="note-shared">
     <div class="label">備註</div>
     <textarea id="noteShared" placeholder="這裡可以寫下備註..."></textarea>
@@ -199,6 +217,9 @@
   <script>
     let roundCount = 0;
     let stitchCount = 0;
+    let countdownTotal = 0;
+    let countdownCount = 0;
+
     let projects = JSON.parse(localStorage.getItem('crochetProjects') || '{}');
     let currentProject = localStorage.getItem('currentProject') || '預設專案';
 
@@ -206,15 +227,21 @@
       projects[currentProject] = {
         round: roundCount || 0,
         stitch: stitchCount || 0,
-        note: document.getElementById('noteShared')?.value || ''
+        note: document.getElementById('noteShared')?.value || '',
+        countdown: {
+          total: countdownTotal || 0,
+          count: countdownCount || 0
+        }
       };
       localStorage.setItem('crochetProjects', JSON.stringify(projects));
       localStorage.setItem('currentProject', currentProject);
     }
 
     function updateTabTitles() {
+      const remain = Math.max(0, countdownTotal - countdownCount);
       document.getElementById('roundTabButton').textContent = `圈數 (${roundCount})`;
       document.getElementById('stitchTabButton').textContent = `針數 (${stitchCount})`;
+      document.getElementById('countdownTabButton').textContent = `倒數針數 (${remain})`;
     }
 
     function loadProjectData() {
@@ -224,6 +251,11 @@
       document.getElementById('roundCount').textContent = roundCount;
       document.getElementById('stitchCount').textContent = stitchCount;
       document.getElementById('noteShared').value = typeof data.note === 'string' ? data.note : '';
+
+      countdownTotal = data.countdown?.total || 0;
+      countdownCount = data.countdown?.count || 0;
+      document.getElementById('countdownInput').value = countdownTotal || '';
+      updateCountdownRemain();
       updateTabTitles();
     }
 
@@ -231,6 +263,7 @@
       saveProjectData();
       currentProject = name;
       if (!projects[name]) projects[name] = {};
+      populateProjectSelector();
       loadProjectData();
     }
 
@@ -309,11 +342,47 @@
       }
     }
 
+    // 倒數針數部分
+    function updateCountdownRemain() {
+      const remain = Math.max(0, countdownTotal - countdownCount);
+      document.getElementById('countdownRemain').textContent = remain;
+      updateTabTitles();
+      saveProjectData();
+    }
+
+    // 反轉：-1按鈕+1，+1按鈕-1
+    function changeCountdown(val) {
+      if (val === 1) {
+        countdownCount = Math.min(countdownTotal, countdownCount + 1);
+      } else if (val === -1) {
+        countdownCount = Math.max(0, countdownCount - 1);
+      }
+      updateCountdownRemain();
+    }
+
+    // 清除針數＝總針數與已完成都歸零
+    function resetCountdown() {
+      if (confirm('你確定要清除倒數針數嗎？這個動作無法還原。')) {
+        countdownTotal = 0;
+        countdownCount = 0;
+        document.getElementById('countdownInput').value = '';
+        updateCountdownRemain();
+      }
+    }
+
     // 初始化
     if (!projects[currentProject]) projects[currentProject] = {};
     populateProjectSelector();
     loadProjectData();
+
     document.getElementById('noteShared').addEventListener('input', saveProjectData);
+
+    // 綁定倒數針數 input 事件
+    document.getElementById('countdownInput').addEventListener('input', function(e) {
+      countdownTotal = Number(e.target.value) || 0;
+      if (countdownCount > countdownTotal) countdownCount = countdownTotal;
+      updateCountdownRemain();
+    });
   </script>
 </body>
 </html>
